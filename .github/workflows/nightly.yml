@@ -37,7 +37,7 @@ jobs:
         run: cmake --build ./build --config RelWithDebInfo --target Terminus --
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@3d1d4cfb535d9cbe9d7a23e8f306f3813a1d8a88
         with:
           name: binary
           path: |
