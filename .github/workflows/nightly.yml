@@ -2,7 +2,7 @@ name: Nightly Build
 
 on:
   schedule:
-    # cronjob that triggers every day at 2PM UTC
+    # Runs every day at 2PM UTC
     - cron: "0 14 * * *"
   workflow_dispatch:
 
@@ -11,28 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check_recent_commit:
-    runs-on: ubuntu-latest
-    name: Check Recent Commit
-    outputs:
-      should_run: ${{ steps.should_run.outputs.should_run }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - id: should_run
-        name: Check if latest commit date is within the previous 24 hours
-        run: |
-          if [ -z "$(git rev-list --since="24 hours ago" --all)" ]; then
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          fi
-
   build_nightly:
     runs-on: self-hosted
     name: Build Nightly
-    needs: check_recent_commit
-    if: needs.check_recent_commit.outputs.should_run == 'true'
     outputs:
       full_sha: ${{ steps.var.outputs.full_sha }}
       short_sha: ${{ steps.var.outputs.short_sha }}
@@ -56,7 +37,7 @@ jobs:
         run: cmake --build ./build --config RelWithDebInfo --target Terminus --
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3
         with:
           name: binary
           path: |
@@ -73,7 +54,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Recreate Release
     needs: build_nightly
-    if: needs.check_recent_commit.outputs.should_run == 'true'
     steps:
       - uses: actions/checkout@v3
 
@@ -86,33 +66,18 @@ jobs:
             const repo = context.repo.repo;
             const tag = "nightly";
 
-            // List all releases and find the release by tag
-            const releases = await github.rest.repos.listReleases({
-              owner: owner,
-              repo: repo,
-            });
+            const releases = await github.rest.repos.listReleases({ owner, repo });
+            const release = releases.data.find(r => r.tag_name === tag);
 
-            const release = releases.data.find(release => release.tag_name === tag);
-
-            // Check if the release exists and delete it
             if (release) {
-              await github.rest.repos.deleteRelease({
-                owner: owner,
-                repo: repo,
-                release_id: release.id,
-              });
+              await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
               console.log(`Deleted release with ID ${release.id}`);
             } else {
               console.log("No existing release to delete");
             }
 
-            // Delete the tag
             try {
-              await github.rest.git.deleteRef({
-                owner: owner,
-                repo: repo,
-                ref: `tags/${tag}`,
-              });
+              await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
               console.log(`Deleted tag ${tag}`);
             } catch (error) {
               console.error(`Error deleting tag: ${error.message}`);
@@ -143,9 +108,9 @@ jobs:
             ```
             ${{ steps.build_sha.outputs.build_sha }}
             ```
-            To verify the build SHA256 during the action, click the build link, go-to "Create Release", open the Echo build sha256 step and read the sha256.
+            To verify the build SHA256 during the action, click the build link, go to "Create Release", open the Echo build sha256 step, and read the sha256.
 
-            You can download the build artifacts, generate a SHA256 checksum and compare it with the below binary.
+            You can download the build artifacts, generate a SHA256 checksum, and compare it with the below binary.
             Build artifacts ARE NOT automatically the same as release assets since release assets can be modified afterwards.
 
             These are nightly builds of Terminus, they are provided for testing purposes only:
